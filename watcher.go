@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"time"
 )
 
 var help = `watcher [command to execute]`
@@ -24,16 +25,22 @@ func main() {
 	cmd, args := os.Args[1], os.Args[2:]
 
 	done := make(chan bool)
+	var event <-chan time.Time
 	go func() {
 		for {
 			c := exec.Command(cmd, args...)
 			c.Stdout = os.Stdout
 			c.Stderr = os.Stderr
 			select {
-			case <-watcher.Event:
+			case <-event:
 				fmt.Println("running", cmd, args)
 				if err := c.Run(); err != nil {
 					log.Println(err)
+				}
+				event = nil
+			case <-watcher.Event:
+				if event == nil {
+					event = time.After(200 * time.Millisecond)
 				}
 			case err := <-watcher.Error:
 				log.Println("fsnotify error:", err)
