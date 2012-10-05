@@ -3,7 +3,7 @@ small filesystem poller and executor
 
 example:
 
-```
+```shell
 ☭ ~ $ go get github.com/traviscline/watcher
 ☭ ~ $ watcher echo "file changed" &
 [1] 35356
