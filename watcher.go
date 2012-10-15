@@ -3,6 +3,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"github.com/howeyc/fsnotify"
 	"log"
@@ -13,16 +14,27 @@ import (
 
 var help = `watcher [command to execute]`
 
+func usage() {
+	fmt.Fprintf(os.Stderr, "usage: %s [flags] [command to execute and args]\n", os.Args[0])
+	flag.PrintDefaults()
+}
+
+var verbose = flag.Bool("v", false, "verbose")
+var after = flag.Int("after", 100, "execute command after [after] milliseconds")
+
 func main() {
+	flag.Usage = usage
+	flag.Parse()
+
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		log.Fatal(err)
 	}
 	if len(os.Args) < 2 {
-		fmt.Fprintln(os.Stderr, help)
+		flag.Usage()
 		os.Exit(1)
 	}
-	cmd, args := os.Args[1], os.Args[2:]
+	cmd, args := flag.Args()[0], flag.Args()[1:]
 
 	done := make(chan bool)
 	var event <-chan time.Time
@@ -39,6 +51,9 @@ func main() {
 				}
 				event = nil
 			case <-watcher.Event:
+				if *verbose {
+					fmt.Println("File changed:", ev)
+				}
 				if event == nil {
 					event = time.After(200 * time.Millisecond)
 				}
