@@ -36,8 +36,10 @@ func main() {
 	}
 	cmd, args := flag.Args()[0], flag.Args()[1:]
 
+	fileEvents := make(chan *fsnotify.FileEvent, 100)
 	done := make(chan bool)
-	var event <-chan time.Time
+	event := time.After(time.Nanosecond)
+
 	go func() {
 		for {
 			c := exec.Command(cmd, args...)
@@ -51,16 +53,24 @@ func main() {
 					log.Println(err)
 				}
 				event = nil
-			case <-watcher.Event:
+			case ev := <-fileEvents:
 				if *verbose {
 					fmt.Println("File changed:", ev)
 				}
+				// drain remaining events
+				drain(fileEvents)
 				if event == nil {
-					event = time.After(200 * time.Millisecond)
+					event = time.After(time.Duration(*after) * time.Millisecond)
 				}
 			case err := <-watcher.Error:
 				log.Println("fsnotify error:", err)
 			}
+		}
+	}()
+	// pipe all events to fileEvents (for buffering and draining)
+	go func() {
+		for {
+			fileEvents <- <-watcher.Event
 		}
 	}()
 
@@ -74,4 +84,14 @@ func main() {
 	}
 	<-done
 	watcher.Close()
+}
+
+func drain(c chan *fsnotify.FileEvent) {
+	for drained := false; drained == false; {
+		select {
+		case <-c:
+		default:
+			drained = true
+		}
+	}
 }
