@@ -43,9 +43,10 @@ func main() {
 			c := exec.Command(cmd, args...)
 			c.Stdout = os.Stdout
 			c.Stderr = os.Stderr
+			c.Stdin = os.Stdin
 			select {
 			case <-event:
-				fmt.Println("running", cmd, args)
+				fmt.Fprintln(os.Stderr, "running", cmd, args)
 				if err := c.Run(); err != nil {
 					log.Println(err)
 				}
