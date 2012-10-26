@@ -20,7 +20,7 @@ func usage() {
 }
 
 var verbose = flag.Bool("v", false, "verbose")
-var after = flag.Int("after", 100, "execute command after [after] milliseconds")
+var after = flag.Int("after", 800, "execute command after [after] milliseconds")
 
 func main() {
 	flag.Usage = usage
