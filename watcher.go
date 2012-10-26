@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/howeyc/fsnotify"
+	"io"
 	"log"
 	"os"
 	"os/exec"
@@ -20,7 +21,7 @@ func usage() {
 }
 
 var verbose = flag.Bool("v", false, "verbose")
-var after = flag.Int("after", 800, "execute command after [after] milliseconds")
+var quiet = flag.Int("quiet", 800, "quiet period after command execution in milliseconds")
 
 func main() {
 	flag.Usage = usage
@@ -38,39 +39,19 @@ func main() {
 
 	fileEvents := make(chan *fsnotify.FileEvent, 100)
 	done := make(chan bool)
-	event := time.After(time.Nanosecond)
 
-	go func() {
-		for {
-			c := exec.Command(cmd, args...)
-			c.Stdout = os.Stdout
-			c.Stderr = os.Stderr
-			c.Stdin = os.Stdin
-			select {
-			case <-event:
-				fmt.Fprintln(os.Stderr, "running", cmd, args)
-				if err := c.Run(); err != nil {
-					log.Println(err)
-				}
-				event = nil
-			case ev := <-fileEvents:
-				if *verbose {
-					fmt.Println("File changed:", ev)
-				}
-				// drain remaining events
-				drain(fileEvents)
-				if event == nil {
-					event = time.After(time.Duration(*after) * time.Millisecond)
-				}
-			case err := <-watcher.Error:
-				log.Println("fsnotify error:", err)
-			}
-		}
-	}()
+	// start watchAndExecute goroutine
+	go watchAndExecute(fileEvents, cmd, args)
+
 	// pipe all events to fileEvents (for buffering and draining)
 	go func() {
 		for {
-			fileEvents <- <-watcher.Event
+			select {
+			case ev := <-watcher.Event:
+				fileEvents <- ev
+			case err := <-watcher.Error:
+				log.Println("fsnotify error:", err)
+			}
 		}
 	}()
 
@@ -86,12 +67,40 @@ func main() {
 	watcher.Close()
 }
 
-func drain(c chan *fsnotify.FileEvent) {
-	for drained := false; drained == false; {
+func watchAndExecute(fileEvents chan *fsnotify.FileEvent, cmd string, args []string) {
+	for {
+		// execute command
+		c := exec.Command(cmd, args...)
+		so, _ := c.StdoutPipe()
+		se, _ := c.StderrPipe()
+		si, _ := c.StdinPipe()
+		go io.Copy(os.Stdout, so)
+		go io.Copy(os.Stderr, se)
+		go io.Copy(os.Stderr, se)
+		go io.Copy(si, os.Stdin)
+
+		fmt.Fprintln(os.Stderr, "running", cmd, args)
+		if err := c.Run(); err != nil {
+			fmt.Fprintln(os.Stderr, "error running:", err)
+		}
+		if *verbose {
+			fmt.Fprintln(os.Stderr, "done.")
+		}
+		// drain until quiet period is over
+		drainUntil(time.After(time.Duration(*quiet)*time.Millisecond), fileEvents)
+		ev := <-fileEvents
+		if *verbose {
+			fmt.Fprintln(os.Stderr, "File changed:", ev)
+		}
+	}
+}
+
+func drainUntil(until <-chan time.Time, c chan *fsnotify.FileEvent) {
+	for finished := false; finished != true; {
 		select {
 		case <-c:
-		default:
-			drained = true
+		case <-until:
+			finished = true
 		}
 	}
 }
