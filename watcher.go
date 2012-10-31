@@ -91,11 +91,11 @@ func watchAndExecute(fileEvents chan *fsnotify.FileEvent, cmd string, args []str
 }
 
 func drainUntil(until <-chan time.Time, c chan *fsnotify.FileEvent) {
-	for finished := false; finished != true; {
+	for {
 		select {
 		case <-c:
 		case <-until:
-			finished = true
+			return
 		}
 	}
 }
