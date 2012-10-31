@@ -71,9 +71,12 @@ func watchAndExecute(fileEvents chan *fsnotify.FileEvent, cmd string, args []str
 	for {
 		// execute command
 		c := exec.Command(cmd, args...)
-		so, _ := c.StdoutPipe()
-		se, _ := c.StderrPipe()
-		si, _ := c.StdinPipe()
+		so, e1 := c.StdoutPipe()
+		se, e2 := c.StderrPipe()
+		si, e3 := c.StdinPipe()
+                if e1 != nil || e2 != nil || e3 != nil {
+                    fmt.Fprintln("pipe error", e1, e2, e3)
+                }
 		go io.Copy(os.Stdout, so)
 		go io.Copy(os.Stderr, se)
 		go io.Copy(os.Stderr, se)
