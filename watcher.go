@@ -79,7 +79,6 @@ func watchAndExecute(fileEvents chan *fsnotify.FileEvent, cmd string, args []str
                 }
 		go io.Copy(os.Stdout, so)
 		go io.Copy(os.Stderr, se)
-		go io.Copy(os.Stderr, se)
 		go io.Copy(si, os.Stdin)
 
 		fmt.Fprintln(os.Stderr, "running", cmd, args)
