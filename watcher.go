@@ -37,7 +37,6 @@ func main() {
 	cmd, args := flag.Args()[0], flag.Args()[1:]
 
 	fileEvents := make(chan *fsnotify.FileEvent, 100)
-	done := make(chan bool)
 
 	// start watchAndExecute goroutine
 	go watchAndExecute(fileEvents, cmd, args)
@@ -62,7 +61,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	<-done
+	<-make(chan struct{})
 	watcher.Close()
 }
 
