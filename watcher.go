@@ -6,7 +6,6 @@ import (
 	"flag"
 	"fmt"
 	"github.com/howeyc/fsnotify"
-	"io"
 	"log"
 	"os"
 	"os/exec"
@@ -71,15 +70,9 @@ func watchAndExecute(fileEvents chan *fsnotify.FileEvent, cmd string, args []str
 	for {
 		// execute command
 		c := exec.Command(cmd, args...)
-		so, e1 := c.StdoutPipe()
-		se, e2 := c.StderrPipe()
-		si, e3 := c.StdinPipe()
-                if e1 != nil || e2 != nil || e3 != nil {
-                    fmt.Fprintln("pipe error", e1, e2, e3)
-                }
-		go io.Copy(os.Stdout, so)
-		go io.Copy(os.Stderr, se)
-		go io.Copy(si, os.Stdin)
+		c.Stdout = os.Stdout
+		c.Stderr = os.Stderr
+		c.Stdin = os.Stdin
 
 		fmt.Fprintln(os.Stderr, "running", cmd, args)
 		if err := c.Run(); err != nil {
