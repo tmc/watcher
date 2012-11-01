@@ -1,5 +1,5 @@
-small filesystem poller and executor
-====================================
+small filesystem watcher and executor
+=====================================
 
 example:
 
