@@ -30,7 +30,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	if len(os.Args) < 2 {
+	if len(flag.Args()) == 0 {
 		flag.Usage()
 		os.Exit(1)
 	}
