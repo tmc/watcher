@@ -9,6 +9,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"time"
 )
 
@@ -20,6 +21,7 @@ func usage() {
 }
 
 var verbose = flag.Bool("v", false, "verbose")
+var recurse = flag.Bool("r", true, "recurse")
 var quiet = flag.Int("quiet", 800, "quiet period after command execution in milliseconds")
 
 func main() {
@@ -47,17 +49,22 @@ func main() {
 			select {
 			case ev := <-watcher.Event:
 				fileEvents <- ev
+				// @todo handle created/renamed/deleted dirs
 			case err := <-watcher.Error:
 				log.Println("fsnotify error:", err)
 			}
 		}
 	}()
 
-	wd, err := os.Getwd()
+	cwd, err := os.Getwd()
 	if err != nil {
 		log.Fatal(err)
 	}
-	err = watcher.Watch(wd)
+	if *recurse {
+		err = watchDirAndChildren(watcher, cwd); 
+	} else {
+		err = watcher.Watch(cwd)
+	}
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -65,6 +72,7 @@ func main() {
 	watcher.Close()
 }
 
+// Execute cmd with args when a file event occurs
 func watchAndExecute(fileEvents chan *fsnotify.FileEvent, cmd string, args []string) {
 	for {
 		// execute command
@@ -89,6 +97,22 @@ func watchAndExecute(fileEvents chan *fsnotify.FileEvent, cmd string, args []str
 	}
 }
 
+// Add dir and children (recursively) to watcher
+func watchDirAndChildren(watcher *fsnotify.Watcher, dir string) error {
+	return filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+		if info.IsDir() {
+			if *verbose {
+				fmt.Fprintln(os.Stderr, "Watching", path)
+			}
+			if err := watcher.Watch(path); err != nil {
+                            return err
+                        }
+		}
+                return nil
+	})
+}
+
+// Drain events from channel until a particular time
 func drainUntil(until <-chan time.Time, c chan *fsnotify.FileEvent) {
 	for {
 		select {
