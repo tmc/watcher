@@ -5,13 +5,17 @@ example:
 
 ```shell
 ☭ ~ $ go get github.com/traviscline/watcher
-☭ ~ $ watcher echo "file changed" &
-[1] 35356
-☭ ~ $ touch foo
-☭ ~ $ running echo [file changed]
-file changed
-
-☭ ~ $ rm foo
-☭ ~ $ running echo [file changed]
-file changed
+☭ /tmp/foo $ watcher echo "triggered"
+running echo [triggered]
+triggered
+^Z
+[1]+  Stopped                 watcher echo "triggered"
+☭ /tmp/foo $ bg
+[1]+ watcher echo "triggered" &
+☭ /tmp/foo $ touch foo
+running echo [triggered]
+triggered
+☭ /tmp/foo $ rm foo
+running echo [triggered]
+triggered
 ```
