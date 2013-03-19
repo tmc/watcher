@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -21,14 +22,14 @@ func usage() {
 }
 
 var verbose = flag.Bool("v", false, "verbose")
-var recurse = flag.Bool("r", true, "recurse")
+var depth = flag.Int("d", 1, "recursion depth")
 var quiet = flag.Int("quiet", 800, "quiet period after command execution in milliseconds")
 
 func main() {
 	flag.Usage = usage
 	flag.Parse()
 
-	watcher, err := fsnotify.NewWatcher()
+	watcher, err := newWatcher()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -38,7 +39,7 @@ func main() {
 	}
 	cmd, args := flag.Args()[0], flag.Args()[1:]
 
-	fileEvents := make(chan *fsnotify.FileEvent, 100)
+	fileEvents := make(chan interface{}, 100)
 
 	// start watchAndExecute goroutine
 	go watchAndExecute(fileEvents, cmd, args)
@@ -60,11 +61,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	if *recurse {
-		err = watchDirAndChildren(watcher, cwd); 
-	} else {
-		err = watcher.Watch(cwd)
-	}
+	err = watcher.watchDirAndChildren(cwd, *depth)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -72,8 +69,17 @@ func main() {
 	watcher.Close()
 }
 
+type watcher struct {
+	*fsnotify.Watcher
+}
+
+func newWatcher() (watcher, error) {
+	fsnw, err := fsnotify.NewWatcher()
+	return watcher{fsnw}, err
+}
+
 // Execute cmd with args when a file event occurs
-func watchAndExecute(fileEvents chan *fsnotify.FileEvent, cmd string, args []string) {
+func watchAndExecute(fileEvents chan interface{}, cmd string, args []string) {
 	for {
 		// execute command
 		c := exec.Command(cmd, args...)
@@ -89,7 +95,7 @@ func watchAndExecute(fileEvents chan *fsnotify.FileEvent, cmd string, args []str
 			fmt.Fprintln(os.Stderr, "done.")
 		}
 		// drain until quiet period is over
-		drainUntil(time.After(time.Duration(*quiet)*time.Millisecond), fileEvents)
+		drainFor(*quiet, fileEvents)
 		ev := <-fileEvents
 		if *verbose {
 			fmt.Fprintln(os.Stderr, "File changed:", ev)
@@ -98,26 +104,34 @@ func watchAndExecute(fileEvents chan *fsnotify.FileEvent, cmd string, args []str
 }
 
 // Add dir and children (recursively) to watcher
-func watchDirAndChildren(watcher *fsnotify.Watcher, dir string) error {
-	return filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+func (w watcher) watchDirAndChildren(path string, depth int) error {
+	if err := w.Watch(path); err != nil {
+		return err
+	}
+	baseNumSeps := strings.Count(path, string(os.PathSeparator))
+	return filepath.Walk(path, func(path string, info os.FileInfo, err error) error {
 		if info.IsDir() {
+			pathDepth := strings.Count(path, string(os.PathSeparator)) - baseNumSeps
+			if pathDepth > depth {
+				return filepath.SkipDir
+			}
 			if *verbose {
 				fmt.Fprintln(os.Stderr, "Watching", path)
 			}
-			if err := watcher.Watch(path); err != nil {
-                            return err
-                        }
+			if err := w.Watch(path); err != nil {
+				return err
+			}
 		}
-                return nil
+		return nil
 	})
 }
 
 // Drain events from channel until a particular time
-func drainUntil(until <-chan time.Time, c chan *fsnotify.FileEvent) {
+func drainFor(drainTimeMs int, c chan interface{}) {
 	for {
 		select {
 		case <-c:
-		case <-until:
+		case <-time.After(time.Duration(drainTimeMs) * time.Millisecond):
 			return
 		}
 	}
