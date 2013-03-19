@@ -10,7 +10,7 @@ usage: watcher [flags] [command to execute and args]
   -d=1: recursion depth
   -quiet=800: quiet period after command execution in milliseconds
   -v=false: verbose
-☭ /tmp/foo $ 
+☭ ~ $ mkdir /tmp/foo; cd /tmp/foo
 ☭ /tmp/foo $ watcher echo "triggered"
 running echo [triggered]
 triggered
@@ -18,10 +18,10 @@ triggered
 [1]+  Stopped                 watcher echo "triggered"
 ☭ /tmp/foo $ bg
 [1]+ watcher echo "triggered" &
-☭ /tmp/foo $ touch foo
+☭ /tmp/foo $ touch bar
 running echo [triggered]
 triggered
-☭ /tmp/foo $ rm foo
+☭ /tmp/foo $ rm bar
 running echo [triggered]
 triggered
 ```
