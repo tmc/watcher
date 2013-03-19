@@ -3,7 +3,7 @@ small filesystem watcher and executor
 
 example:
 
-```shell
+```sh
 ☭ ~ $ go get github.com/traviscline/watcher
 ☭ $ watcher -h
 usage: watcher [flags] [command to execute and args]
