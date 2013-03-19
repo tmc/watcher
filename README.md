@@ -5,6 +5,12 @@ example:
 
 ```shell
 ☭ ~ $ go get github.com/traviscline/watcher
+☭ $ watcher -h
+usage: watcher [flags] [command to execute and args]
+  -d=1: recursion depth
+  -quiet=800: quiet period after command execution in milliseconds
+  -v=false: verbose
+☭ /tmp/foo $ 
 ☭ /tmp/foo $ watcher echo "triggered"
 running echo [triggered]
 triggered
