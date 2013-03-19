@@ -5,7 +5,7 @@ example:
 
 ```sh
 ☭ ~ $ go get github.com/traviscline/watcher
-☭ $ watcher -h
+☭ ~ $ watcher -h
 usage: watcher [flags] [command to execute and args]
   -d=1: recursion depth
   -quiet=800: quiet period after command execution in milliseconds
