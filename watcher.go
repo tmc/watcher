@@ -22,7 +22,7 @@ func usage() {
 }
 
 var verbose = flag.Bool("v", false, "verbose")
-var depth = flag.Int("d", 1, "recursion depth")
+var depth = flag.Int("depth", 1, "recursion depth")
 var quiet = flag.Int("quiet", 800, "quiet period after command execution in milliseconds")
 var dir = flag.String("dir", ".", "directory root to use for watching")
 
