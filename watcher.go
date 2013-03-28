@@ -24,6 +24,7 @@ func usage() {
 var verbose = flag.Bool("v", false, "verbose")
 var depth = flag.Int("d", 1, "recursion depth")
 var quiet = flag.Int("quiet", 800, "quiet period after command execution in milliseconds")
+var dir = flag.String("dir", ".", "directory root to use for watching")
 
 func main() {
 	flag.Usage = usage
@@ -57,11 +58,11 @@ func main() {
 		}
 	}()
 
-	cwd, err := os.Getwd()
+	dir, err := filepath.Abs(*dir)
 	if err != nil {
 		log.Fatal(err)
 	}
-	err = watcher.watchDirAndChildren(cwd, *depth)
+	err = watcher.watchDirAndChildren(dir, *depth)
 	if err != nil {
 		log.Fatal(err)
 	}
