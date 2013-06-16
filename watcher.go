@@ -22,6 +22,7 @@ func usage() {
 }
 
 var verbose = flag.Bool("v", false, "verbose")
+var kill = flag.Bool("k", false, "kill the previously running program before starting a new one")
 var depth = flag.Int("d", 1, "recursion depth")
 var quiet = flag.Int("quiet", 800, "quiet period after command execution in milliseconds")
 
@@ -88,7 +89,7 @@ func watchAndExecute(fileEvents chan interface{}, cmd string, args []string) {
 		c.Stdin = os.Stdin
 
 		fmt.Fprintln(os.Stderr, "running", cmd, args)
-		if err := c.Run(); err != nil {
+		if err := c.Start(); err != nil {
 			fmt.Fprintln(os.Stderr, "error running:", err)
 		}
 		if *verbose {
@@ -100,6 +101,18 @@ func watchAndExecute(fileEvents chan interface{}, cmd string, args []string) {
 		if *verbose {
 			fmt.Fprintln(os.Stderr, "File changed:", ev)
 		}
+
+		if *kill {
+			if *verbose {
+				fmt.Fprintln(os.Stderr, "Attempting to kill previous command")
+			}
+			if err := c.Process.Kill(); err != nil {
+				fmt.Fprintf(os.Stderr, "Error killing proc(%d): %s\n", c.Process.Pid, err)
+			}
+		}
+
+		// Make sure resources are cleaned up
+		c.Wait()
 	}
 }
 
