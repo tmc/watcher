@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
 	"github.com/howeyc/fsnotify"
 )
 
@@ -18,6 +19,7 @@ var (
 	depth   = flag.Int("depth", 1, "recursion depth")
 	dir     = flag.String("dir", ".", "directory root to use for watching")
 	quiet   = flag.Duration("quiet", 800*time.Millisecond, "quiet period after command execution")
+	ignore  = flag.String("ignore", "", "path ignore pattern")
 )
 
 func usage() {
@@ -43,6 +45,18 @@ func main() {
 
 	// pipe all events to fileEvents (for buffering and draining)
 	go watcher.pipeEvents(fileEvents)
+
+	// if we have an ignore pattern, set up predicate and replace fileEvents
+	if *ignore != "" {
+		fileEvents = filter(fileEvents, func(e interface{}) bool {
+			fe := e.(*fsnotify.FileEvent)
+			ignored, err := filepath.Match(*ignore, filepath.Base(fe.Name))
+			if err != nil {
+				fmt.Fprintln(os.Stderr, "error performing match:", err)
+			}
+			return !ignored
+		})
+	}
 
 	go watchAndExecute(fileEvents, cmd, args)
 
@@ -126,6 +140,19 @@ func (w watcher) pipeEvents(events chan interface{}) {
 			log.Println("fsnotify error:", err)
 		}
 	}
+}
+
+func filter(items chan interface{}, predicate func(interface{}) bool) chan interface{} {
+	results := make(chan interface{})
+	go func() {
+		for {
+			item := <-items
+			if predicate(item) {
+				results <- item
+			}
+		}
+	}()
+	return results
 }
 
 // drainFor drains events from channel with a until a period in ms has elapsed timeout
