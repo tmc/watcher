@@ -42,21 +42,10 @@ func main() {
 
 	fileEvents := make(chan interface{}, 100)
 
-	// start watchAndExecute goroutine
-	go watchAndExecute(fileEvents, cmd, args)
-
 	// pipe all events to fileEvents (for buffering and draining)
-	go func() {
-		for {
-			select {
-			case ev := <-watcher.Event:
-				fileEvents <- ev
-				// @todo handle created/renamed/deleted dirs
-			case err := <-watcher.Error:
-				log.Println("fsnotify error:", err)
-			}
-		}
-	}()
+	go watcher.pipeEvents(fileEvents)
+
+	go watchAndExecute(fileEvents, cmd, args)
 
 	dir, err := filepath.Abs(*dir)
 	if err != nil {
@@ -127,6 +116,17 @@ func (w watcher) watchDirAndChildren(path string, depth int) error {
 	})
 }
 
+func (w watcher) pipeEvents(events chan interface{}) {
+	for {
+		select {
+		case ev := <-w.Event:
+			events <- ev
+			// @todo handle created/renamed/deleted dirs
+		case err := <-w.Error:
+			log.Println("fsnotify error:", err)
+		}
+	}
+}
 // Drain events from channel until a particular time
 func drainFor(drainTimeMs int, c chan interface{}) {
 	for {
