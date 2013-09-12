@@ -1,10 +1,14 @@
 small filesystem watcher and executor
 =====================================
 
-example:
+watcher is a simple utility that waits for filesystem activity to execute a command
 
+
+Example:
+
+In Shell A:
 ```sh
-☭ ~ $ go get github.com/traviscline/watcher
+☭ ~ $ go get github.com/tmc/watcher
 ☭ ~ $ watcher -h
 usage: watcher [flags] [command to execute and args]
   -d=1: recursion depth
@@ -14,14 +18,15 @@ usage: watcher [flags] [command to execute and args]
 ☭ /tmp/foo $ watcher echo "triggered"
 running echo [triggered]
 triggered
-^Z
-[1]+  Stopped                 watcher echo "triggered"
-☭ /tmp/foo $ bg
-[1]+ watcher echo "triggered" &
-☭ /tmp/foo $ touch bar
-running echo [triggered]
-triggered
-☭ /tmp/foo $ rm bar
-running echo [triggered]
-triggered
 ```
+
+Now, In Shell B:
+```sh
+☭ ~ $ touch /tmp/foo/oi
+```
+
+Every time /tmp/foo changes the echo will be re-executed.
+
+I use this to run tests, trigger build steps, refresh browsers, etc.
+
+License: ISC
