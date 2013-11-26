@@ -127,12 +127,14 @@ func (w watcher) pipeEvents(events chan interface{}) {
 		}
 	}
 }
-// Drain events from channel until a particular time
+
+// drainFor drains events from channel with a until a period in ms has elapsed timeout
 func drainFor(drainTimeMs int, c chan interface{}) {
+	timeout := time.After(time.Duration(drainTimeMs) * time.Millisecond)
 	for {
 		select {
 		case <-c:
-		case <-time.After(time.Duration(drainTimeMs) * time.Millisecond):
+		case <-timeout:
 			return
 		}
 	}
