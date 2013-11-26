@@ -1,17 +1,16 @@
 // watches the current directory for changes and runs the specificed program on change
-
 package main
 
 import (
 	"flag"
 	"fmt"
-	"github.com/howeyc/fsnotify"
 	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
+	"github.com/howeyc/fsnotify"
 )
 
 var help = `watcher [command to execute]`
