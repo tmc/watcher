@@ -13,17 +13,17 @@ import (
 	"github.com/howeyc/fsnotify"
 )
 
-var help = `watcher [command to execute]`
+var (
+	verbose = flag.Bool("v", false, "verbose")
+	depth   = flag.Int("depth", 1, "recursion depth")
+	dir     = flag.String("dir", ".", "directory root to use for watching")
+	quiet   = flag.Duration("quiet", 800*time.Millisecond, "quiet period after command execution")
+)
 
 func usage() {
 	fmt.Fprintf(os.Stderr, "usage: %s [flags] [command to execute and args]\n", os.Args[0])
 	flag.PrintDefaults()
 }
-
-var verbose = flag.Bool("v", false, "verbose")
-var depth = flag.Int("depth", 1, "recursion depth")
-var quiet = flag.Int("quiet", 800, "quiet period after command execution in milliseconds")
-var dir = flag.String("dir", ".", "directory root to use for watching")
 
 func main() {
 	flag.Usage = usage
@@ -115,6 +115,7 @@ func (w watcher) watchDirAndChildren(path string, depth int) error {
 	})
 }
 
+// pipeEvents sends valid events to `events` and errors to stderr
 func (w watcher) pipeEvents(events chan interface{}) {
 	for {
 		select {
@@ -128,8 +129,8 @@ func (w watcher) pipeEvents(events chan interface{}) {
 }
 
 // drainFor drains events from channel with a until a period in ms has elapsed timeout
-func drainFor(drainTimeMs int, c chan interface{}) {
-	timeout := time.After(time.Duration(drainTimeMs) * time.Millisecond)
+func drainFor(drainUntil time.Duration, c chan interface{}) {
+	timeout := time.After(drainUntil)
 	for {
 		select {
 		case <-c:
