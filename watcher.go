@@ -19,6 +19,7 @@ var (
 	depth   = flag.Int("depth", 1, "recursion depth")
 	dir     = flag.String("dir", ".", "directory root to use for watching")
 	quiet   = flag.Duration("quiet", 800*time.Millisecond, "quiet period after command execution")
+	wait    = flag.Duration("wait", 10*time.Millisecond, "time to wait between change detection and exec")
 	ignore  = flag.String("ignore", "", "path ignore pattern")
 )
 
@@ -84,6 +85,7 @@ func newWatcher() (watcher, error) {
 // Execute cmd with args when a file event occurs
 func watchAndExecute(fileEvents chan interface{}, cmd string, args []string) {
 	for {
+		time.Sleep(*wait)
 		// execute command
 		c := exec.Command(cmd, args...)
 		c.Stdout = os.Stdout
