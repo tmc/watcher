@@ -51,7 +51,9 @@ func main() {
 	if *ignore != "" {
 		fileEvents = filter(fileEvents, func(e interface{}) bool {
 			fe := e.(*fsnotify.FileEvent)
-			ignored, err := filepath.Match(*ignore, filepath.Base(fe.Name))
+			wd, _ := os.Getwd()
+			relPath, _ := filepath.Rel(wd, fe.Name)
+			ignored, err := filepath.Match(*ignore, relPath)
 			if err != nil {
 				fmt.Fprintln(os.Stderr, "error performing match:", err)
 			}
@@ -60,6 +62,7 @@ func main() {
 	}
 
 	go watchAndExecute(fileEvents, cmd, args)
+	defer watcher.Close()
 
 	dir, err := filepath.Abs(*dir)
 	if err != nil {
@@ -70,7 +73,6 @@ func main() {
 		log.Fatal(err)
 	}
 	select {}
-	watcher.Close()
 }
 
 type watcher struct {
