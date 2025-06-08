@@ -1,4 +1,3 @@
-// watches the current directory for changes and runs the specified program on change
 package main
 
 import (
@@ -25,12 +24,8 @@ var (
 	quiet      = flag.Duration("quiet", 800*time.Millisecond, "quiet period after command execution")
 	wait       = flag.Duration("wait", 10*time.Millisecond, "time to wait between change detection and exec")
 	ignoreFlag = flag.String("ignore", "", "comma-separated list of glob patterns to ignore")
+	clear      = flag.Bool("c", false, "clear terminal before each run")
 )
-
-func usage() {
-	fmt.Fprintf(os.Stderr, "usage: %s [flags] [command to execute and args]\n", os.Args[0])
-	flag.PrintDefaults()
-}
 
 func main() {
 	flag.Usage = usage
@@ -51,7 +46,18 @@ func main() {
 		flag.Usage()
 		os.Exit(1)
 	}
-	cmd, args := flag.Args()[0], flag.Args()[1:]
+
+	var cmd string
+	var args []string
+
+	// If single argument that looks like a shell command, use sh -c
+	singleArg := flag.Args()[0]
+	if len(flag.Args()) == 1 && (strings.Contains(singleArg, ";") || strings.Contains(singleArg, "&&") || strings.Contains(singleArg, "||") || strings.Contains(singleArg, "|") || strings.Contains(singleArg, "=") || strings.Contains(singleArg, "$")) {
+		cmd = "sh"
+		args = []string{"-c", singleArg}
+	} else {
+		cmd, args = flag.Args()[0], flag.Args()[1:]
+	}
 
 	// Create the fsnotify watcher
 	fsWatcher, err := fsnotify.NewWatcher()
@@ -89,6 +95,14 @@ func main() {
 		log.Fatalf("Error watching directory: %v", err)
 	}
 
+	// Trigger initial run after wait delay
+	time.Sleep(*wait)
+	select {
+	case fileEvents <- fsnotify.Event{Name: "startup", Op: fsnotify.Write}:
+	case <-ctx.Done():
+		return
+	}
+
 	// Wait for context cancellation
 	<-ctx.Done()
 	wg.Wait()
@@ -101,6 +115,19 @@ func main() {
 func watchAndExecute(ctx context.Context, wg *sync.WaitGroup, fileEvents chan fsnotify.Event, cmd string, args []string) {
 	defer wg.Done()
 
+	var currentProcess *exec.Cmd
+	var processMu sync.Mutex
+
+	// Handle context cancellation to kill running process
+	go func() {
+		<-ctx.Done()
+		processMu.Lock()
+		if currentProcess != nil && currentProcess.Process != nil {
+			currentProcess.Process.Kill()
+		}
+		processMu.Unlock()
+	}()
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -109,12 +136,24 @@ func watchAndExecute(ctx context.Context, wg *sync.WaitGroup, fileEvents chan fs
 			if !ok {
 				return
 			}
-			
+
 			// Wait a bit between detecting the change and executing the command
 			time.Sleep(*wait)
-			
+
 			if *verbose {
 				fmt.Fprintln(os.Stderr, "File changed:", ev.Name)
+			}
+
+			// Clear terminal if requested
+			if *clear {
+				fmt.Print("\033[H\033[2J")
+			}
+
+			// Kill any existing process
+			processMu.Lock()
+			if currentProcess != nil && currentProcess.Process != nil {
+				currentProcess.Process.Kill()
+				currentProcess.Wait() // Wait for cleanup
 			}
 
 			// Execute command
@@ -122,6 +161,8 @@ func watchAndExecute(ctx context.Context, wg *sync.WaitGroup, fileEvents chan fs
 			c.Stdout = os.Stdout
 			c.Stderr = os.Stderr
 			c.Stdin = os.Stdin
+			currentProcess = c
+			processMu.Unlock()
 
 			fmt.Fprintln(os.Stderr, "running", cmd, strings.Join(args, " "))
 			if err := c.Run(); err != nil {
@@ -129,6 +170,10 @@ func watchAndExecute(ctx context.Context, wg *sync.WaitGroup, fileEvents chan fs
 					fmt.Fprintln(os.Stderr, "error running:", err)
 				}
 			}
+
+			processMu.Lock()
+			currentProcess = nil
+			processMu.Unlock()
 			if *verbose {
 				fmt.Fprintln(os.Stderr, "done.")
 			}
@@ -204,16 +249,16 @@ func pipeEvents(ctx context.Context, wg *sync.WaitGroup, w *fsnotify.Watcher, ev
 					log.Println("Error getting working directory:", err)
 					return
 				}
-				
+
 				// Only watch if within depth limit
 				baseDir := *dir
 				if !filepath.IsAbs(baseDir) {
 					baseDir = filepath.Join(wd, baseDir)
 				}
-				
+
 				baseNumSeps := strings.Count(baseDir, string(os.PathSeparator))
 				pathDepth := strings.Count(event.Name, string(os.PathSeparator)) - baseNumSeps
-				
+
 				if pathDepth <= *depth {
 					if *verbose {
 						fmt.Fprintln(os.Stderr, "New directory detected:", event.Name)
@@ -240,15 +285,15 @@ func pipeEvents(ctx context.Context, wg *sync.WaitGroup, w *fsnotify.Watcher, ev
 			if !ok {
 				return
 			}
-			
+
 			// Check for directory creation
 			watchNewDirs(ev)
-			
+
 			// Skip ignored patterns
 			if shouldIgnore(ev.Name, ignorePatterns) {
 				continue
 			}
-			
+
 			// Send the event
 			select {
 			case events <- ev:
@@ -271,13 +316,13 @@ func shouldIgnore(path string, patterns []string) bool {
 		log.Println("Error getting working directory:", err)
 		return false
 	}
-	
+
 	relPath, err := filepath.Rel(wd, path)
 	if err != nil {
 		log.Println("Error calculating relative path:", err)
 		return false
 	}
-	
+
 	// Check each pattern
 	for _, pattern := range patterns {
 		matched, err := filepath.Match(pattern, relPath)
@@ -289,7 +334,7 @@ func shouldIgnore(path string, patterns []string) bool {
 			return true
 		}
 	}
-	
+
 	return false
 }
 
